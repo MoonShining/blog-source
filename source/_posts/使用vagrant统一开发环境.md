@@ -1,6 +1,6 @@
 ---
 title: 使用vagrant统一开发环境
-date: 2017-02-05 09:33:33
+date: 2016-06-05 09:33:33
 tags: vagrant
 ---
 

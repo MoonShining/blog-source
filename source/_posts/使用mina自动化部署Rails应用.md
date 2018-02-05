@@ -1,6 +1,6 @@
 ---
 title: 使用mina自动化部署Rails应用
-date: 2018-02-05 09:41:57
+date: 2016-10-05 09:41:57
 tags: 自动化部署
 ---
 ![](http://upload-images.jianshu.io/upload_images/4073552-1881d52edbf495e0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
