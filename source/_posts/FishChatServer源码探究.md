@@ -2,6 +2,8 @@
 title: FishChatServer源码探究
 date: 2018-02-05 17:53:02
 tags:
+    - golang
+    - 造轮子
 ---
 
 在写im-go的过程中遇到了一些设计上的问题，于是想找目前有的开源im服务的源码看看。[FishChatServer2](https://github.com/oikomi/FishChatServer2)在一些模块设计上和我的思路很相似，有种英雄所见略同的快感，所以选了它(FishChatServer2的拆包方式和我[上一篇文章](https://moonshining.github.io/blog/2018/02/05/golang-tcp%E6%8B%86%E5%8C%85%E7%9A%84%E6%AD%A3%E7%A1%AE%E5%A7%BF%E5%8A%BF)中提到的使用`ReadFull`的方式是一样的，并且连模块名字都一样叫Codec)
