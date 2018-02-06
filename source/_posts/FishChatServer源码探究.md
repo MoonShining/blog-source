@@ -14,8 +14,10 @@ libnet, 是所有server的基础公共库，封装了诸如Listen Accept之类�
 server, 具体的服务，看了一下gateway和access两个服务的实现
 ![](http://7xqlni.com1.z0.glb.clouddn.com/server.png)
 
+---
+
 ### gateway服务
-**gateway.go**是gateway服务的入口，核心代码如下
+**gateway.go**是gateway服务的入口，其实是一个access服务的负载均衡器，核心代码如下
 
 ```go
     // 初始化对象
@@ -116,4 +118,186 @@ func (c *Client) procReqAccessServer(reqData []byte) (err error) {
 }
 ```
 
-到此一次请求就结束了，可用看出代码的结构上非常清晰，很容易就能理解
+到此一次请求就结束了，可用看出代码的结构上非常清晰，很容易就能理解。
+
+---
+
+### libnet
+
+这个模块帮我们屏蔽了大量繁琐的网络细节，接下来就要看一下它的实现了。
+
+从**api.go**入手，这里定义了对外的接口
+
+```go
+type Protocol interface { 
+    // Codec 负责通信协议的解析，封装了读写数据的方法
+    NewCodec(rw io.ReadWriter) Codec 
+}
+
+type Codec interface {
+    Receive() ([]byte, error)
+    Send(interface{}) error
+    Close() error
+}
+
+func Serve(network, address string, protocol Protocol, sendChanSize int) (*Server, error) {
+    listener, err := net.Listen(network, address) // 终于看到标准库里的东西了
+    if err != nil {
+        return nil, err
+    }
+    // listener用于Accept， protocol用户处理net.Conn, sendChanSize看上去好像是用来控制发送速率的，不过没有明白为什么需要控制?
+    return NewServer(listener, protocol, sendChanSize), nil 
+}
+
+// 客户端连接+带超时的连接
+func Connect(network, address string, protocol Protocol, sendChanSize int) (*Session, error) {
+    conn, err := net.Dial(network, address)
+    if err != nil {
+        return nil, err
+    }
+    return NewSession(protocol.NewCodec(conn), sendChanSize), nil
+}
+
+func ConnectTimeout(network, address string, timeout time.Duration, protocol Protocol, sendChanSize int) (*Session, error) {
+    conn, err := net.DialTimeout(network, address, timeout)
+    if err != nil {
+        return nil, err
+    }
+    return NewSession(protocol.NewCodec(conn), sendChanSize), nil
+}
+```
+
+跳过客户的部分的实现，探索一下**server.go**,负责Accept一个连接，并且封装好一个session对象返回
+
+```go
+func (server *Server) Accept() (*Session, error) {
+    var tempDelay time.Duration
+    for {
+        conn, err := server.listener.Accept()
+        if err != nil {
+            // 处理Temporary Error应该是参考了goblog里的error-handling-and-go章节
+            // For instance, a web crawler might sleep and retry when it encounters a temporary error and give up otherwise.
+            if ne, ok := err.(net.Error); ok && ne.Temporary() {
+                if tempDelay == 0 {
+                    tempDelay = 5 * time.Millisecond
+                } else {
+                    tempDelay *= 2
+                }
+                if max := 1 * time.Second; tempDelay > max {
+                    tempDelay = max
+                }
+                time.Sleep(tempDelay)
+                continue
+            }
+            // 感觉直接比较字符串有点太粗暴了？ 但应该是没有办法区分的原因
+            if strings.Contains(err.Error(), "use of closed network connection") {
+                return nil, io.EOF
+            }
+            return nil, err
+        }
+        return server.manager.NewSession(
+            server.protocol.NewCodec(conn),
+            server.sendChanSize,
+        ), nil
+    }
+}
+```
+
+**manager.go**用于管理session，会把session根据id mod 32以后，放进对应的map里, 这里使用了lock来保证并发安全, 但golang1.9以后，应该可以用内置的**sync.Map**替代了
+
+```go
+
+func (manager *Manager) NewSession(codec Codec, sendChanSize int) *Session {
+    session := newSession(manager, codec, sendChanSize)
+    manager.putSession(session)
+    return session
+}
+
+func (manager *Manager) putSession(session *Session) {
+    smap := &manager.sessionMaps[session.id%sessionMapNum]
+    smap.Lock()
+    defer smap.Unlock()
+    smap.sessions[session.id] = session
+    manager.disposeWait.Add(1)
+}
+```
+
+---
+
+### Session
+
+server在Accept之后，返回的是一个session对象,session负责收发数据，并且实现了**优雅退出(gracefully shutdown)**
+
+```go
+type Session struct {
+    id             uint64
+    codec          Codec
+    manager        *Manager
+    sendChan       chan interface{}
+    closeFlag      int32
+    closeChan      chan int
+    closeMutex     sync.Mutex
+    closeCallbacks *list.List
+    State          interface{}
+}
+```
+
+优雅退出的实现，先通过CAS设置一下closeFlag, 成功设置的gorutine可以执行清理操作，失败的gorutine返回SessionClosedError
+```go
+func (session *Session) Close() error {
+    // 如果成功通过CAS设置了closeFlag
+    if atomic.CompareAndSwapInt32(&session.closeFlag, 0, 1) {
+        err := session.codec.Close() // 关闭net.Conn
+        close(session.closeChan) // 退出sendLoop
+        if session.manager != nil { // 从manager中移除session
+            session.manager.delSession(session)
+        }
+        session.invokeCloseCallbacks() // 执行callback
+        return err
+    }
+    return SessionClosedError
+}
+```
+
+发送数据部分
+
+```
+func (session *Session) sendLoop() {
+    defer session.Close()
+    for {
+        // 使用select语句来保证，关闭closeChan之后可以退出sendLoop
+        select {
+        case msg := <-session.sendChan:
+            if session.codec.Send(msg) != nil {
+                return
+            }
+        case <-session.closeChan:
+            return
+        }
+    }
+}
+
+func (session *Session) Send(msg interface{}) (err error) {
+    // 在每次Send的时候，都会检查closeFlag，实现快速的退出
+    if session.IsClosed() {
+        return SessionClosedError
+    }
+    if session.sendChan == nil {
+        return session.codec.Send(msg)
+    }
+
+    // send block, 返回一个异常, 有点粗暴了
+    select {
+    case session.sendChan <- msg:
+        return nil
+    default:
+        return SessionBlockedError
+    }
+}
+```
+
+---
+
+### 最后
+
+其实本意是想找找有没有关于心跳和连接保持方面的代码，但没有什么收获.不过也看到了很多高质量的实现，例如**idgen**，粗粗瞟了一眼就发现，应该是使用了雪花算法，此外还有大量微服务的设计，以及一些我很感兴趣的流行开源技术栈(k8s docker etcd hbase kafka)可以看出是一整套经过深思熟虑的系统，决定过年期间要好好看一看这个库，吸收一下营养。
