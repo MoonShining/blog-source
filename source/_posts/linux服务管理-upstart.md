@@ -44,7 +44,7 @@ upstart 会给守护进程发送 SIGHUP 信号，此时，upstart 希望该守�
 
 •当收到 SIGTERM 信号后，upstart 希望守护进程进程立即干净地退出，释放所有资源。如果一个进程在收到 SIGTERM 信号后不退出，upstart 将对其发送 SIGKILL 信号。
 
-### 日常upstart命令
+### 日常upstart命令 
 
 全部 | 简写
 ---- | ---
