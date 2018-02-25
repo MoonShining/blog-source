@@ -1,0 +1,15 @@
+menu:
+  Home: /
+  Archives: /archives
+  Tags: /tags
+
+# duoshuo comment
+duoshuo: false
+duoshuo_name:
+
+# disqus comment
+disqus: true
+disqus_shortname: moons-blog
+
+# google analytics
+googleTrackId: UA-113488010-1
