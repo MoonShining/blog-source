@@ -12,4 +12,4 @@ disqus: true
 disqus_shortname: moons-blog
 
 # google analytics
-googleTrackId: UA-113488010-1
+googleTrackId:
