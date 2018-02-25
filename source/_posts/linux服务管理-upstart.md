@@ -1,5 +1,5 @@
 ---
-title: linux服务管理1-upstart
+title: linux服务管理-upstart
 date: 2018-02-25 09:48:30
 tags:
     - linux
@@ -111,6 +111,13 @@ exec ./naivehttpserver
 这样，就可以使用```sudo start naivehttpserver```这样的命令来管理naivehttpserver服务了。
 
 更全的用法可以看[http://upstart.ubuntu.com/cookbook/](http://upstart.ubuntu.com/cookbook/)和[http://upstart.ubuntu.com/wiki/](http://upstart.ubuntu.com/wiki/)
+
+### systemd
+目前upstart有被systemd取代的趋势, 列一些资料
+
++ http://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-commands.html
++ http://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-part-two.html
++ https://wiki.archlinux.org/index.php/systemd_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)
 
 ### 参考资料
 
