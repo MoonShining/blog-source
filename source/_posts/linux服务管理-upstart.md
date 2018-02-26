@@ -95,6 +95,7 @@ exec $DAEMON
 简单写一个
 
 ```
+# /etc/init/naievehttpserver.conf
 description "naive http golang server"
 author "xxx"
 
