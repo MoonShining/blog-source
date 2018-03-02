@@ -1,12 +1,12 @@
 ---
-title: 使用influxdb构建运营数据Metrics系统
+title: 使用influxdb收集用户行为数据
 date: 2018-03-01 14:25:40
 tags:
     - 后端
     - influxdb
     - golang
 ---
-目前我们需要收集一些用户行为数据。
+目前我们需要收集一些用户在站点上的行为数据，又不想投入精力研发一整套的体系，于是找到了influxdb。
 
 influxdb内置了HTTP API,免去了编写接入代码的繁琐，并带有数据查询和展示的组件，非常适合。
 
@@ -93,6 +93,8 @@ CREATE RETENTION POLICY "one_day_only" ON "mydb" DURATION 1d REPLICATION 1 DEFAU
 
 [安装启动过程](https://docs.influxdata.com/influxdb/v1.2/introduction/installation/)不提
 
-在使用它之前，需要先学习一下基本的[查询语法](https://docs.influxdata.com/influxdb/v1.4/query_language/data_exploration/)
+在使用它之前，需要先学习一下基本的[influxdb查询语法](https://docs.influxdata.com/influxdb/v1.4/query_language/data_exploration/)
 
-[TO BE CONTINUE]
+![](http://7xqlni.com1.z0.glb.clouddn.com/chronograf.png)
+
+这样，就可以轻松的在Chronograf中查询数据了，如果需要额外的数据，可以让业务方导出csv自行分析。
