@@ -1,5 +1,5 @@
 ---
-title: [WIP]goim-comet模块源码分析
+title: goim-comet模块源码分析
 date: 2018-03-09 10:04:31
 tags:
     - golang

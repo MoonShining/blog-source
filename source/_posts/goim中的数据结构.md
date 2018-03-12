@@ -323,4 +323,85 @@ func (c *Cleaner) PushFront(key int64, expire time.Duration) {
 ```
 
 ### Comet模块中的RingBuf
+RingBuf是一个环形缓冲区，其中保存的是空闲的proto对象，负责TCP数据的拆包封包。每个连接都会初始化自己的RingBuf。
 
+值得一提的是，RingBuf使用`sequence & （array length－1） = array index`这样的方式来定位元素,非常高效。
+
+```golang
+type Ring struct {
+    // read
+    rp   uint64
+    num  uint64
+    mask uint64
+    // TODO split cacheline, many cpu cache line size is 64
+    // pad [40]byte
+    // write
+    wp   uint64
+    data []proto.Proto
+}
+
+func NewRing(num int) *Ring {
+    r := new(Ring)
+    r.init(uint64(num))
+    return r
+}
+
+func (r *Ring) Init(num int) {
+    r.init(uint64(num))
+}
+
+func (r *Ring) init(num uint64) {
+    // 2^N
+    if num&(num-1) != 0 {
+        for num&(num-1) != 0 {
+            num &= (num - 1)
+        }
+        num = num << 1
+    }
+    r.data = make([]proto.Proto, num)
+    r.num = num
+    r.mask = r.num - 1
+}
+
+func (r *Ring) Get() (proto *proto.Proto, err error) {
+    if r.rp == r.wp {
+        return nil, ErrRingEmpty
+    }
+    proto = &r.data[r.rp&r.mask]
+    return
+}
+
+func (r *Ring) GetAdv() {
+    r.rp++
+    if Debug {
+        log.Debug("ring rp: %d, idx: %d", r.rp, r.rp&r.mask)
+    }
+}
+
+func (r *Ring) Set() (proto *proto.Proto, err error) {
+    if r.wp-r.rp >= r.num {
+        return nil, ErrRingFull
+    }
+    proto = &r.data[r.wp&r.mask]
+    return
+}
+
+func (r *Ring) SetAdv() {
+    r.wp++
+    if Debug {
+        log.Debug("ring wp: %d, idx: %d", r.wp, r.wp&r.mask)
+    }
+}
+
+func (r *Ring) Reset() {
+    r.rp = 0
+    r.wp = 0
+    // prevent pad compiler optimization
+    // r.pad = [40]byte{}
+}
+```
+
+### 参考资料
+
+[http://ifeve.com/dissecting-disruptor-whats-so-special/](http://ifeve.com/dissecting-disruptor-whats-so-special/)
+[https://github.com/Terry-Mao/goim](https://github.com/Terry-Mao/goim)
