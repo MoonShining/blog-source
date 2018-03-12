@@ -190,14 +190,12 @@ func (p *Pool) Get() (b *Buffer) {
 ```
 
 ### Timer
-goim的Timer也是基于堆结构改写的，内部只有一个timer，不断设置成堆顶元素的触发时间。
-```golang
-// lib/time/timer.go
-
-
-```
+goim的Timer也是基于堆结构改写的，内部只有一个timer，不断把定时器设置成堆顶元素的触发时间来提高效率。
 
 ### Channel
+
+TCP连接会被封装到Channel这个结构中，使用CliProto来处理封包拆包
+
 ```golang
 type Channel struct {
     RoomId   int32
