@@ -1,6 +1,6 @@
 ---
-title: kafka introduce
-date: 2018-03-13 09:57:21
+title: kafka introduce翻译
+date: 2017-12-13 09:57:21
 tags: kafka
 ---
 
